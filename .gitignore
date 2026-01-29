@@ -1,0 +1,23 @@
+# Local .terraform directories (contains binaries)
+**/.terraform/*
+
+# .tfstate files (Contains secrets - NEVER COMMIT)
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+
+# Ignore any local plan files
+*tfplan*
+
+# Exclude all .tfvars files (Likely contain passwords/secrets)
+*.tfvars
+*.tfvars.json
+
+# GCP service account credentials
+credentials.json
+
+gcloud.cheatsheet
+
+*.sh

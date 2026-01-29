@@ -1,0 +1,14 @@
+the @main.tf is actually an deployment for septiadi.com-backend
+however i have lots of microservices
+- fnb-pos using cloud run
+- fnb-kds using cloud run
+- fnb-inventory using cloud run
+
+and each of them having 3 types of environment (dev, staging, prod)
+i want you to make 
+- module folder containing cloud-run deployment
+- environments folder each having dev staging n prod
+- inside env, there will be the deployment tf files for the microservices
+- and each microservices implement the cloud-run module
+- for now move the main.tf as septiadi.com-backend 
+- and add dummy deployment tf for fnb-pos, fnb-kds and fnb-inventory
