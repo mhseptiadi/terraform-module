@@ -2,6 +2,8 @@ resource "google_cloud_run_v2_service" "default" {
   name     = var.service_name
   location = var.location
 
+  deletion_protection = false
+
   ingress = var.ingress
 
   labels = var.labels
@@ -81,6 +83,14 @@ resource "google_cloud_run_v2_service" "default" {
         }
       }
     }
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    
+    ignore_changes = [
+      template[0].containers[0].image,
+    ]
   }
 }
 
