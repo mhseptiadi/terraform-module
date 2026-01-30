@@ -6,28 +6,48 @@ This Terraform configuration manages Google Cloud Run deployments for the Septia
 
 ```
 infrastructure-manager/
+├── main.tf                 # Root: provider config, required_providers, project_config module
+├── import.tf               # Import blocks (e.g. existing Cloud Run → Terraform state)
+├── github-secrets.tf       # GitHub Actions secrets (Workload Identity, Infra Manager token)
+├── ai-instruct.yaml        # AI / editor instructions
+├── .gitignore
+├── .terraform.lock.hcl
+│
 ├── module/
-│   ├── cloud-run/          # Reusable Cloud Run module
-│   │   ├── main.tf         # Module resources
-│   │   ├── variables.tf    # Module input variables
-│   │   └── outputs.tf      # Module outputs
-│   └── project-config/     # Project configuration module
-│       ├── main.tf         # Project config mappings
-│       ├── variables.tf    # Environment and project type variables
-│       └── outputs.tf      # Project ID and credentials outputs
+│   ├── cloud-run/          # Reusable Cloud Run (v2) module
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   └── project-config/     # Project/environment config (project ID, service account)
+│       ├── main.tf
+│       ├── variables.tf
+│       └── outputs.tf
+│
 ├── environments/
-│   └── prod/               # Production environment
+│   └── prod/
 │       └── septiadi_site/
-│           ├── project-config.tf    # Project configuration
-│           ├── gcp-infra-config.tf  # GCP infrastructure configuration
-│           └── septiadi.com/
-│               ├── backend.tf       # Terraform backend configuration (GCS)
-│               ├── main.tf          # Cloud Run service definition
-│               └── variables.tf     # Service variables
-├── main.tf                 # Root provider configuration
-├── github-secrets.tf       # GitHub Actions secrets injection
-└── .gitignore             # Git ignore rules
+│           ├── project-config.tf    # Instantiates project-config as "septiadi_site"
+│           ├── gcp-infra-config.tf  # GCP infra (Secret Manager, Cloud Build GitHub connection)
+│           ├── .terraform.lock.hcl
+│           └── septiadi.com/        # Cloud Run service: septiadi-com
+│               ├── main.tf          # cloud-run module + image_url variable
+│               ├── variables.tf
+│               ├── backend.__       # GCS backend (rename to backend.tf to use)
+│               └── .terraform.lock.hcl
+│
+├── gcloud.cheatsheet       # gcloud / GCP CLI notes
+├── gcp-service-account-setup.sh
+├── workload-identity-federation-setup.sh
+├── service-account-role-setup.sh
+└── trigger_deployment.sh
 ```
+
+**Terraform working directories**
+
+- **Root** (`infrastructure-manager/`): provider setup, `project_config` module, GitHub secrets. Run `terraform init` / `plan` / `apply` from here for root-level resources.
+- **Service** (`environments/prod/septiadi_site/septiadi.com/`): Cloud Run service. Uses GCS backend; run `terraform init` / `plan` / `apply` from this directory to manage the septiadi.com service. Ensure backend config is active (e.g. rename `backend.__` to `backend.tf` or use `-backend-config`).
+
+**Importing existing resources:** Use `import.tf` (or equivalent `import` blocks) to bring existing GCP resources (e.g. Cloud Run) into Terraform state; then run `terraform plan` to align config with code.
 
 ## 🚀 Prerequisites
 
@@ -66,9 +86,9 @@ infrastructure-manager/
 
 ## 🎯 Usage
 
-### Deploying the Septiadi.com Service
+### Deploying the Septiadi.com service
 
-1. **Navigate to the service directory:**
+1. **Use the service directory** (backend is GCS; ensure `backend.tf` is present, e.g. by renaming `backend.__`):
    ```bash
    cd environments/prod/septiadi_site/septiadi.com
    ```
@@ -80,12 +100,12 @@ infrastructure-manager/
 
 3. **Plan your deployment:**
    ```bash
-   terraform plan -var="image_url=asia-southeast2-docker.pkg.dev/PROJECT_ID/septiadi.com/septiadi.com:latest"
+   terraform plan -var="image_url=us-central1-docker.pkg.dev/PROJECT_ID/cloud-run-source-deploy/septiadi-com:latest"
    ```
 
 4. **Apply the configuration:**
    ```bash
-   terraform apply -var="image_url=asia-southeast2-docker.pkg.dev/PROJECT_ID/septiadi.com/septiadi.com:latest"
+   terraform apply -var="image_url=us-central1-docker.pkg.dev/PROJECT_ID/cloud-run-source-deploy/septiadi-com:latest"
    ```
 
 ### Using Root Directory (Provider Configuration Only)
@@ -167,13 +187,13 @@ The `module/cloud-run` is a reusable module for deploying Google Cloud Run servi
 | `volume_mounts` | list(object) | Volume mount configurations | No (default: []) |
 | `labels` | map(string) | Service labels | No (default: {}) |
 | `template_labels` | map(string) | Template labels | No (default: {}) |
-| `public_access` | bool | Allow public access | No (default: true) |
+| `public_access` | bool | Allow public access | No (default: false) |
 
 ### Example: Adding a New Service
 
 Create a new directory under `environments/prod/septiadi_site/` (e.g., `my-service/`) with:
 
-**backend.tf:**
+**backend.tf** (or copy from `septiadi.com/backend.__` and rename):
 ```hcl
 terraform {
   backend "gcs" {
@@ -188,38 +208,26 @@ terraform {
 module "my_service" {
   source = "../../../../module/cloud-run"
 
-  service_name = "my-service"
-  location     = "asia-southeast2"
+  service_name   = "my-service"
+  location       = "us-central1"   # or asia-southeast2
+  service_account = "PROJECT_NUMBER-compute@developer.gserviceaccount.com"  # or from project-config output
 
   ingress = "INGRESS_TRAFFIC_ALL"
+  labels  = { "environment" = "prod", "service" = "my-service" }
+  template_labels = { "environment" = "prod", "service" = "my-service" }
 
-  labels = {
-    "environment" = "prod"
-    "service"     = "my-service"
-  }
-
-  template_labels = {
-    "environment" = "prod"
-    "service"     = "my-service"
-  }
-
-  max_instance_count    = 2
-  service_account       = module.septiadi_site.service_account
+  max_instance_count    = 3
   timeout               = "300s"
   execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
   session_affinity      = false
 
-  image         = var.image_url
+  image          = var.image_url
   container_port = 8080
-
-  cpu_limit    = "1"
-  memory_limit = "512Mi"
+  cpu_limit      = "1000m"
+  memory_limit   = "128Mi"
 
   env_vars = [
-    {
-      name  = "NODE_ENV"
-      value = "production"
-    }
+    { name = "NODE_ENV", value = "production" }
   ]
 
   public_access = true
@@ -233,6 +241,8 @@ variable "image_url" {
   type        = string
 }
 ```
+
+Run `terraform init` and `terraform plan` / `apply` from the new service directory.
 
 ## 🔧 Common Terraform Commands
 
@@ -272,22 +282,22 @@ terraform destroy -target=module.xxx # Destroy specific resource
 
 ## 🔑 Project Configuration
 
-The `module/project-config` module manages project-specific configurations:
-- **Project IDs**: Different GCP project IDs for each environment
-- **Service Accounts**: GCP service account emails for each environment
-- **Project Types**: Currently supports `septiadi_site`
+The `module/project-config` module holds environment-specific GCP settings:
+- **Project ID** and **Service Account** per environment (dev, staging, prod)
+- **Project types**: e.g. `septiadi_site` (wired in `environments/prod/septiadi_site/project-config.tf`)
 
-Each project folder has its own `project-config.tf` that instantiates the module with the appropriate project type.
+**Where it’s used:**
+- **Root** (`main.tf`): `module "project_config"` — used by the root Google provider (`project = module.project_config.project_id`).
+- **Environment** (`environments/prod/septiadi_site/project-config.tf`): `module "septiadi_site"` — use when running Terraform from that directory.
 
-### Module Outputs
+### Module outputs
 
-The project-config module provides the following outputs:
-- `project_id`: GCP Project ID for the environment
-- `service_account`: GCP Service Account email
+- `project_id` — GCP project ID for the selected environment  
+- `service_account` — GCP service account email  
+- `project_type` — project type string  
 
-These outputs can be referenced in deployment files using:
-- `module.septiadi_site.project_id`
-- `module.septiadi_site.service_account`
+From root: `module.project_config.project_id`, `module.project_config.service_account`  
+From `septiadi_site`: `module.septiadi_site.project_id`, `module.septiadi_site.service_account`
 
 ## 🔐 Security Notes
 
@@ -329,10 +339,10 @@ terraform init
 terraform force-unlock <LOCK_ID>
 ```
 
-### Backend Configuration Errors
+### Backend configuration errors
 - Ensure the GCS bucket exists: `gsutil ls gs://tf-state-septiadi_site-dev`
 - Verify you have permissions to read/write to the bucket
-- Check the backend configuration in `backend.tf`
+- Service dir uses a GCS backend: copy or rename `backend.__` to `backend.tf` in `environments/prod/septiadi_site/septiadi.com/` if Terraform doesn’t pick it up
 
 ## 📚 Additional Resources
 
@@ -345,15 +355,15 @@ terraform force-unlock <LOCK_ID>
 
 ### Common Workflows
 
-**Deploy septiadi.com service:**
+**Deploy septiadi.com service** (run from service directory; ensure backend is configured, e.g. `backend.tf` or `backend.__`):
 ```bash
 cd environments/prod/septiadi_site/septiadi.com
 terraform init
-terraform plan -var="image_url=asia-southeast2-docker.pkg.dev/PROJECT_ID/septiadi.com/septiadi.com:latest"
-terraform apply -var="image_url=asia-southeast2-docker.pkg.dev/PROJECT_ID/septiadi.com/septiadi.com:latest"
+terraform plan -var="image_url=us-central1-docker.pkg.dev/PROJECT_ID/cloud-run-source-deploy/septiadi-com:latest"
+terraform apply -var="image_url=us-central1-docker.pkg.dev/PROJECT_ID/cloud-run-source-deploy/septiadi-com:latest"
 ```
 
-**Update a specific service:**
+**Update septiadi.com (new image):**
 ```bash
 cd environments/prod/septiadi_site/septiadi.com
 terraform plan -var="image_url=NEW_IMAGE_URL"

@@ -1,5 +1,6 @@
 # Local .terraform directories (contains binaries)
-**/.terraform/*
+**/.terraform/
+.terraform
 
 # .tfstate files (Contains secrets - NEVER COMMIT)
 *.tfstate
