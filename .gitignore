@@ -20,4 +20,6 @@ credentials.json
 
 gcloud.cheatsheet
 
+generated*.tf
+
 *.sh
