@@ -344,6 +344,100 @@ terraform force-unlock <LOCK_ID>
 - Verify you have permissions to read/write to the bucket
 - Service dir uses a GCS backend: copy or rename `backend.__` to `backend.tf` in `environments/prod/septiadi_site/septiadi.com/` if Terraform doesn’t pick it up
 
+## gcloud Cheatsheet
+
+Reference commands for GCP setup. See also `gcloud.cheatsheet` in the repo root.
+
+### 1. Workload Identity Pool (GitHub Actions)
+
+```bash
+# Create the Workload Identity Pool
+gcloud iam workload-identity-pools create "github" \
+  --project="qios-fnb-dev-c071f" \
+  --location="global" \
+  --display-name="GitHub Actions Pool"
+
+# Create the Provider (connects GitHub OIDC to the Pool)
+gcloud iam workload-identity-pools providers create-oidc "qios" \
+  --project="qios-fnb-dev-c071f" \
+  --location="global" \
+  --workload-identity-pool="github" \
+  --display-name="My GitHub Repo Provider" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
+  --issuer-uri="https://token.actions.githubusercontent.com"
+
+# Allow GitHub repo to impersonate Service Account (replace SA name as needed)
+gcloud iam service-accounts add-iam-policy-binding "terraform@qios-fnb-dev-c071f.iam.gserviceaccount.com" \
+  --project="qios-fnb-dev-c071f" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/Qios/queue_display"
+```
+
+### 2. Export existing GCP to Terraform
+
+- **From root:** `terraform plan -generate-config-out=./generated_resources.tf`
+- Update `main.tf` in the environment from `generated_resources.tf`
+- Add `import.tf` to the environment (see sample `import.tf`); it will restate
+- Run deployment; if successful, remove `import.tf` from the environment
+
+### 3. GCP GitHub connection (Cloud Build)
+
+```bash
+# Grant SA
+gcloud projects add-iam-policy-binding PROJECT_ID \
+    --member="serviceAccount:service-PROJECT_NUMBER@gcp-sa-cloudbuild.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.admin"
+
+# Create the connection
+gcloud builds connections create github github-connection --region=asia-southeast2
+
+# Verify
+gcloud builds connections describe github-connection --region=asia-southeast2
+
+# Connect repo
+gcloud builds repositories create ifrastructure-manager \
+  --remote-uri=https://github.com/mhseptiadi/infrastructure-manager.git \
+  --connection=github-connection --region=asia-southeast2
+```
+
+### 4. Developer Connect (Infra Manager)
+
+- **Developer Connect:** https://console.cloud.google.com/developer-connect  
+- **Cloud Build 2nd gen repos:** https://console.cloud.google.com/cloud-build/repositories/2nd-gen?project=PROJECT_ID  
+
+```bash
+gcloud infra-manager deployments apply projects/PROJECT_ID/locations/asia-southeast2/deployments/septiadi-com \
+  --git-source-directory="environments/prod/septiadi_site/septiadi.com" \
+  --git-source-repo="https://github.com/mhseptiadi/infrastructure-manager.git" \
+  --service-account="projects/PROJECT_ID/serviceAccounts/terraform@PROJECT_ID.iam.gserviceaccount.com" \
+  --git-source-ref="master" \
+  --input-values="project_id=PROJECT_ID,image_url=us-central1-docker.pkg.dev/PROJECT_ID/cloud-run-source-deploy/septiadi-com@sha256:2605618017c3543684c95761aa4422e8909a7c6533170ef8f97e5088711a8db1"
+```
+
+### 5. Bulk export existing GCP to Terraform (deprecated)
+
+```bash
+# Enable Cloud Asset API
+gcloud services enable cloudasset.googleapis.com
+
+# Create SA for exporting
+gcloud beta services identity create --service=cloudasset.googleapis.com --project=PROJECT_ID
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member=serviceAccount:service-PROJECT_NUMBER@gcp-sa-cloudasset.iam.gserviceaccount.com \
+  --role=roles/cloudasset.serviceAgent
+
+# Export
+gcloud beta resource-config bulk-export --path=OUTPUT_DIRECTORY_PATH --project=PROJECT_ID --resource-format=terraform
+
+gcloud beta resource-config bulk-export \
+  --project=PROJECT_ID \
+  --resource-types=RunService \
+  --resource-format=terraform \
+  > cloud_run.tf
+```
+
+---
+
 ## 📚 Additional Resources
 
 - [Terraform Google Provider Documentation](https://registry.terraform.io/providers/hashicorp/google/latest/docs)
