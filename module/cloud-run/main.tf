@@ -48,6 +48,8 @@ resource "google_cloud_run_v2_service" "default" {
       }
 
       resources {
+        cpu_idle = true
+
         limits = {
           cpu    = var.cpu_limit
           memory = var.memory_limit
