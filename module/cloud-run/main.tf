@@ -3,6 +3,8 @@ resource "google_cloud_run_v2_service" "default" {
   location = var.location
 
   deletion_protection = false
+  
+  invoker_iam_disabled = var.public_access
 
   ingress = var.ingress
 
@@ -39,6 +41,9 @@ resource "google_cloud_run_v2_service" "default" {
 
     containers {
       image = var.image
+
+      command = var.container_command 
+      args    = var.container_args
 
       dynamic "ports" {
         for_each = var.container_port != null ? [1] : []

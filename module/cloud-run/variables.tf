@@ -91,6 +91,16 @@ variable "memory_limit" {
   default     = "512Mi"
 }
 
+variable "container_command" {
+  description = "Container Command"
+  type        = list(string)
+}
+
+variable "container_args" {
+  description = "Container Args"
+  type        = list(string)
+}
+
 variable "volume_mounts" {
   description = "List of volume mounts"
   type = list(object({
