@@ -72,18 +72,6 @@ infrastructure-manager/
    terraform init
    ```
 
-3. **Set environment variable (optional, defaults to "prod"):**
-   ```bash
-   # For Windows PowerShell
-   $env:TF_VAR_environment = "prod"
-   
-   # For Windows CMD
-   set TF_VAR_environment=prod
-   
-   # For Linux/Mac
-   export TF_VAR_environment=prod
-   ```
-
 ## 🎯 Usage
 
 ### Deploying the Septiadi.com service
@@ -110,13 +98,9 @@ infrastructure-manager/
 
 ### Using Root Directory (Provider Configuration Only)
 
-The root `main.tf` is used for provider configuration. To set the environment:
+The root `main.tf` is used for provider configuration:
 
 ```bash
-# Set environment variable
-export TF_VAR_environment=prod  # or dev, staging
-
-# Initialize and validate
 terraform init
 terraform validate
 ```
