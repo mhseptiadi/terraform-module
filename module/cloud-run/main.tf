@@ -54,6 +54,7 @@ resource "google_cloud_run_v2_service" "default" {
 
       resources {
         cpu_idle = true
+        startup_cpu_boost  = var.startup_cpu_boost
 
         limits = {
           cpu    = var.cpu_limit
@@ -96,7 +97,7 @@ resource "google_cloud_run_v2_service" "default" {
     prevent_destroy = true
     
     ignore_changes = [
-      template[0].containers[0].image,
+      # template[0].containers[0].image,
     ]
   }
 }

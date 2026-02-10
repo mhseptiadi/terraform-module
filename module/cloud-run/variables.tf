@@ -47,7 +47,7 @@ variable "timeout" {
 variable "execution_environment" {
   description = "Execution environment (GEN1 or GEN2)"
   type        = string
-  default     = "EXECUTION_ENVIRONMENT_GEN2"
+  default     = ""
 }
 
 variable "session_affinity" {
@@ -133,4 +133,10 @@ variable "secrets" {
     version     = optional(string, "latest") # Version of the secret
   }))
   default = []
+}
+
+variable "startup_cpu_boost" {
+  description = "Whether to enable startup CPU boost"
+  type        = bool
+  default     = false
 }
