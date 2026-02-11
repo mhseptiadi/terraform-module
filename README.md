@@ -9,37 +9,17 @@ infrastructure-manager/
 ├── main.tf                 # Root: provider config, required_providers, project_config module
 ├── import.tf               # Import blocks (e.g. existing Cloud Run → Terraform state)
 ├── github-secrets.tf       # GitHub Actions secrets (Workload Identity, Infra Manager token)
-├── ai-instruct.yaml        # AI / editor instructions
 ├── .gitignore
-├── .terraform.lock.hcl
 │
-├── module/
-│   ├── cloud-run/          # Reusable Cloud Run (v2) module
-│   │   ├── main.tf
-│   │   ├── variables.tf
-│   │   └── outputs.tf
-│   └── project-config/     # Project/environment config (project ID, service account)
-│       ├── main.tf
-│       ├── variables.tf
-│       └── outputs.tf
-│
-├── environments/
-│   └── prod/
-│       └── septiadi_site/
-│           ├── project-config.tf    # Instantiates project-config as "septiadi_site"
-│           ├── gcp-infra-config.tf  # GCP infra (Secret Manager, Cloud Build GitHub connection)
-│           ├── .terraform.lock.hcl
-│           └── septiadi.com/        # Cloud Run service: septiadi-com
-│               ├── main.tf          # cloud-run module + image_url variable
-│               ├── variables.tf
-│               ├── backend.__       # GCS backend (rename to backend.tf to use)
-│               └── .terraform.lock.hcl
-│
-├── gcloud.cheatsheet       # gcloud / GCP CLI notes
-├── gcp-service-account-setup.sh
-├── workload-identity-federation-setup.sh
-├── service-account-role-setup.sh
-└── trigger_deployment.sh
+└── module/
+    ├── cloud-run/          # Reusable Cloud Run (v2) module
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    └── project-config/     # Project/environment config (project ID, service account)
+        ├── main.tf
+        ├── variables.tf
+        └── outputs.tf
 ```
 
 **Terraform working directories**
