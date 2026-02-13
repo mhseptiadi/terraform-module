@@ -26,3 +26,5 @@ gcloud.cheatsheet
 generated*.tf
 
 *.sh
+
+expressions.txt
